@@ -147,7 +147,7 @@ void printData(int & netCount, vector<string> & inputs
 }
 
 // Prints the internal data structure for netlist 1 or 2
-void printDataForNetlist(int netlistNumber)
+void dumpNetlist(int netlistNumber)
 {
 	if (netlistNumber == 1)	{
 		printData(netCount1, inputs1, outputs1, map1, gates1);
@@ -179,7 +179,7 @@ void printCNF(vector< vector<int> > & cnf)
 		cout << "(";
 		vector<int> curClause = cnf[i];
 		for (unsigned int j=0; j<curClause.size(); j++)	{
-			cout << curClause[j] << " ";
+			cout << curClause[j] << "";
 		}
 		cout << ")"<<"\n";
 	}
@@ -187,15 +187,18 @@ void printCNF(vector< vector<int> > & cnf)
 
 int findHighestNetNumber(vector<vector<int> >& cnf) {
 
-	int outer= cnf.size()-1;
-	int inner=cnf[outer].size()-1;
-	return cnf[outer][inner];
+	return cnf[cnf.size()-1][cnf[cnf.size()-1].size()-1];
 }
 
 void performUnitClauseRule(int table_counter_ex[], vector<vector<int> >& cnf) {
-	// unit clause RULE:
-	bool unitClauseFound;
-	do {
+
+
+
+
+	bool unitClauseFound = false;
+
+	while(!unitClauseFound){
+
 		unitClauseFound = false;
 		for (int i = cnf.size() - 1; i >= 0; i--) {
 			if (cnf[i].size() == 1) {
@@ -221,20 +224,20 @@ void performUnitClauseRule(int table_counter_ex[], vector<vector<int> >& cnf) {
 				break;
 			}
 		}
-	} while (unitClauseFound);
+	}
 }
 
 void emptyCnfTermination(int table_counter_ex[]) {
 	cout
 	<< "CNF Is empty. This is a counter example.\n";
 	for (size_t i = 0; i < inputs1.size(); i++) {
-		cout << "input: literal number " << inputs1[i] << " => "
+		cout << "INPUT" << inputs1[i] << " => "
 				<< table_counter_ex[map1[inputs1[i]] - 1] << "\n";
 	}
 	for (size_t i = 0; i < outputs1.size(); i++) {
-		cout << "output:literal number " << outputs1[i] << " for circuit A"
+		cout << "OUTPUT: " << outputs1[i] << " for circuit A"
 				<< "=> " << table_counter_ex[map1[outputs1[i]] - 1] << "\n";
-		cout << "output:literal number " << outputs1[i] << " for circuit B"
+		cout << "OUTPUT: " << outputs1[i] << " for circuit B"
 				<< "=> "
 				<< table_counter_ex[map2[outputs1[i]] + netCount1 - 1] << "\n";
 	}
@@ -423,13 +426,39 @@ void AddMiterInputAndOutputs(vector<vector<int> >& cnf) {
 	cnf.push_back(cl1);
 }
 
+int invalidArguments(){
+	cout
+	<< "Invalid arguments...\n\n"
+	<< "Usage:\n"
+	<< "\tsat-solver <file1> <file2>\n\n"
+	<< "For example:\n"
+	<< "\tsat-solver /path/to/file1 /path/to/file2"
+	<< endl;
+
+	return -1;
+}
+
+/* some error checking for netlist file! */
+int invalidGateType(int file, int index)
+{
+	cout
+	<< "Gate in file "
+	<< file
+	<< " at index "
+	<< index
+	<< "currentGate"
+	<<  endl;
+	return -3;
+}
+
 int main(int argc, char ** argv)
 {
 	if (argc != 3)
 	{
 		cerr << "Wrong argument count!\n";
-		return -1;
+		return invalidArguments();
 	}
+
 	if (readFiles(argv[1], argv[2]) != 0)
 	{
 		cerr << "Error while reading files!\n";
@@ -461,10 +490,13 @@ int main(int argc, char ** argv)
 	//   - gates1[0].nets[2] is 3 (XOR output port)
 
 	// Print out data structure - (for debugging)
-	cout << "Circuit A:\n==========\n";
-	printDataForNetlist(1);
-	cout << "\nCircuitt B:\n==========\n";
-	printDataForNetlist(2);
+	cout << "Circuit A:\n";
+	cout << "---------:\n";
+	dumpNetlist(1);
+
+	cout << "\nCircuitt B:\n";
+	cout << "---------:\n";
+	dumpNetlist(2);
 
 
 	//
@@ -474,52 +506,64 @@ int main(int argc, char ** argv)
 	//
 	vector< vector<int> > cnf;
 
-	//********Gates 1*********
+	//Circuit A
 	for (size_t i=0;i < gates1.size();i++) {
 
 		Gate currentGate=gates1[i];
 
-		if (currentGate.type == XOR) {
+		switch (currentGate.type) {
+		case XOR:
 			addClausesForXorGate(cnf, currentGate);
-		}
+			break;
 
-		if (currentGate.type == AND) {
-			addClausesForAndGate(cnf, currentGate);
-		}
-
-		if (currentGate.type == INV) {
-			addClausesForInvGate(cnf, currentGate);
-		}
-
-		if (currentGate.type == OR)	{
+		case OR:
 			addClausesForOrGate(cnf, currentGate);
+			break;
+
+		case AND:
+			addClausesForAndGate(cnf, currentGate);
+			break;
+
+		case INV:
+			addClausesForInvGate(cnf, currentGate);
+			break;
+
+		default:
+			return invalidGateType(1, i);
 		}
 	}
 
 
-
-	//********Gates 2**********
+	//Circuit B
 	for (size_t i=0;i < gates2.size();i++) {
+
+		//Increment assigned number to each gate with offset to last
+		//gate of gate 1
 		for(size_t j=0;j< gates2[i].nets.size();j++) {
 			gates2[i].nets[j] += netCount1;
 		}
 
 		Gate currentGate=gates2[i];
 
-		if (currentGate.type == XOR) {
+		switch (currentGate.type) {
+		case XOR:
 			addClausesForXorGate(cnf, currentGate);
-		}
+			break;
 
-		if (currentGate.type == AND) {
-			addClausesForAndGate(cnf, currentGate);
-		}
-
-		if (currentGate.type == INV) {
-			addClausesForInvGate(cnf, currentGate);
-		}
-
-		if (currentGate.type == OR)	{
+		case OR:
 			addClausesForOrGate(cnf, currentGate);
+			break;
+
+		case AND:
+			addClausesForAndGate(cnf, currentGate);
+			break;
+
+		case INV:
+			addClausesForInvGate(cnf, currentGate);
+			break;
+
+		default:
+			return invalidGateType(2, i);
 		}
 	}
 
