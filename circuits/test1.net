@@ -1,0 +1,11 @@
+5
+a b
+c d
+1 a
+2 b
+3 c
+4 d
+
+inv 1 3
+inv 2 5
+or 3 5 4
